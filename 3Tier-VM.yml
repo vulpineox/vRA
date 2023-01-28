@@ -1,0 +1,248 @@
+formatVersion: 1
+inputs:
+  _web:
+    type: string
+    title: Web Server
+    description: WEB Server Hostname
+  _was:
+    type: string
+    title: WAS Server
+    description: WAS Server Hostname
+  _db:
+    type: string
+    title: DB Server
+    description: DB Server Hostname
+  _fab:
+    type: string
+    title: Division#1
+    default: fab
+  _svc:
+    type: string
+    title: Division#2
+    default: svc
+  _purpose:
+    type: string
+    title: Purpose
+    default: app
+  web_image:
+    type: string
+    title: Web Image
+  _web_image_linux_yn:
+    type: string
+    title: Web Image Linux Y/N
+  was_image:
+    type: string
+    title: Was Image
+  _was_image_linux_yn:
+    type: string
+    title: Was Image Linux Y/N
+  db_image:
+    type: string
+    title: DB Image
+  _db_image_linux_yn:
+    type: string
+    title: DB Image Linux Y/N
+  web_cpu:
+    type: integer
+    default: 2
+    title: WEB CPU
+  web_memory:
+    type: integer
+    title: WEB Memory(GB)
+    default: 4
+  web_disk:
+    type: array
+    title: Web Disk
+    maxItems: 1
+    require: true
+  was_cpu:
+    type: integer
+    default: 2
+    title: WAS CPU
+  was_memory:
+    type: integer
+    title: WAS Memory(GB)
+    default: 4
+  was_disk:
+    type: array
+    title: WAS Disk
+    maxItems: 1
+    require: true
+  db_cpu:
+    type: integer
+    default: 4
+    title: DB CPU
+  db_memory:
+    type: integer
+    title: DB Memory(GB)
+    default: 16
+  db_disk:
+    type: array
+    title: DB Disk
+    maxItems: 1
+    require: true
+  db_root_pwd:
+    type: string
+    title: DB Root 비밀번호
+    require: true
+    encrypted: true
+  db_user:
+    type: string
+    title: DB User ID
+    require: true
+  db_pwd:
+    type: string
+    title: DB User 비밀번호
+    require: true
+    encrypted: true
+  db_name:
+    type: string
+    title: 신규 Database이름
+    require: true
+  #db_table:
+  #  type: string
+  #  title: DB Table Name
+  #apps_param:
+  #  type: array
+  #  description: 'simple format: [key]=[val], list format: [key]=[val1]&[val2]&[val3]'
+  #  title: Parameters
+  #  default: ''
+  os_param:
+    type: array
+    description: 'useradd : os_local_user=account'
+    title: os_param
+    require: true
+#multi_disk:
+#  type: array
+#  title: Disk
+#  description: mountPath=diskSize
+#apps:
+#  type: array
+#  description: ''
+#  title: Application
+#  default: ''
+resources:
+  Public:
+    type: Cloud.Network
+    properties:
+      networkType: existing
+      constraints:
+        - tag: git-service
+  web:
+    type: Cloud.vSphere.Machine
+    properties:
+      nodes: '${input._web}'
+      category: clovirsm-3tier
+      image: '${input.web_image}'
+      cpuCount: '${input.web_cpu}'
+      totalMemoryMB: '${input.web_memory*1024}'
+      folderName: '${input._purpose}/${input._svc}'
+      customizationSpec: '${input._web_image_linux_yn==''Y''? "LINUX_PROFILE_DHCP":"WINDOWS_PROFILE_DHCP"}'
+      was_ip: '${resource.was.networks[0].address}'
+      web_ip: '${resource.web.networks[0].address}'
+      web_mac: '${resource.web.networks[0].macaddress}'
+      application: nginx_1.20.2
+      # param: '${join(input.apps_param,",")}'
+      os_param: '${join(input.os_param,",")}'
+      multi_disk: '${input.web_disk[0]}'
+      osType: '${input._web_image_linux_yn == "Y" ? "LINUX" : "WINDOWS"}'
+      tags:
+        - key: fab
+          value: '${input._fab}'
+        - key: purpose
+          value: web
+      constraints:
+        - tag: git
+      networks:
+        - network: '${resource.Public.id}'
+          assignment: static
+      attachedDisks:
+        - source: '${resource.Cloud_vSphere_Disk_1.id}'
+  was:
+    type: Cloud.vSphere.Machine
+    properties:
+      nodes: '${input._was}'
+      category: clovirsm-3tier
+      image: '${input.was_image}'
+      cpuCount: '${input.was_cpu}'
+      osType: '${input._was_image_linux_yn == "Y" ? "LINUX" : "WINDOWS"}'
+      totalMemoryMB: '${input.was_memory*1024}'
+      folderName: '${input._purpose}/${input._svc}'
+      customizationSpec: '${input._was_image_linux_yn==''Y''? "LINUX_PROFILE_DHCP":"WINDOWS_PROFILE_DHCP"}'
+      db_ip: '${resource.db.networks[0].address}'
+      was_ip: '${resource.was.networks[0].address}'
+      was_mac: '${resource.was.networks[0].macaddress}'
+      db_user: '${input.db_user}'
+      db_name: '${input.db_name}'
+      db_pwd: '${input.db_pwd}'
+      db_root_pwd: '${input.db_root_pwd}'
+      application: tomcat_8.5
+      # param: '${join(input.apps_param,",")}'
+      os_param: '${join(input.os_param,",")}'
+      multi_disk: '${input.was_disk[0]}'
+      tags:
+        - key: fab
+          value: '${input._fab}'
+        - key: svc
+          value: '${input._svc}'
+        - key: purpose
+          value: was
+        - key: ServiceCode
+          value: '${input._svc + input._purpose}'
+      constraints:
+        - tag: git
+      networks:
+        - network: '${resource.Public.id}'
+          assignment: static
+      attachedDisks:
+        - source: '${resource.Cloud_vSphere_Disk_2.id}'
+  db:
+    type: Cloud.vSphere.Machine
+    properties:
+      nodes: '${input._db}'
+      category: clovirsm-3tier
+      osType: '${input._db_image_linux_yn == "Y" ? "LINUX" : "WINDOWS"}'
+      image: '${input.db_image}'
+      cpuCount: '${input.db_cpu}'
+      totalMemoryMB: '${input.db_memory*1024}'
+      folderName: '${input._purpose}/${input._svc}'
+      customizationSpec: '${input._db_image_linux_yn==''Y''? "LINUX_PROFILE_DHCP":"WINDOWS_PROFILE_DHCP"}'
+      db_ip: '${resource.db.networks[0].address}'
+      db_mac: '${resource.db.networks[0].macaddress}'
+      application: mariadb_10.6
+      # param: '${join(input.apps_param,",")}'
+      os_param: '${join(input.os_param,",")}'
+      multi_disk: '${input.db_disk[0]}'
+      db_user: '${input.db_user}'
+      db_pwd: '${input.db_pwd}'
+      db_root_pwd: '${input.db_root_pwd}'
+      db_name: '${input.db_name}'
+      #db_table: '${input.db_table}'
+      tags:
+        - key: fab
+          value: '${input._fab}'
+        - key: svc
+          value: '${input._svc}'
+        - key: purpose
+          value: db
+        - key: ServiceCode
+          value: '${input._svc + input._purpose}'
+      constraints:
+        - tag: git
+      networks:
+        - network: '${resource.Public.id}'
+          assignment: static
+      attachedDisks:
+        - source: '${resource.Cloud_vSphere_Disk_3.id}'
+  Cloud_vSphere_Disk_1:
+    type: Cloud.vSphere.Disk
+    properties:
+      capacityGb: '${split(input.web_disk[0],"=")[1]}'
+  Cloud_vSphere_Disk_2:
+    type: Cloud.vSphere.Disk
+    properties:
+      capacityGb: '${split(input.was_disk[0],"=")[1]}'
+  Cloud_vSphere_Disk_3:
+    type: Cloud.vSphere.Disk
+    properties:
+      capacityGb: '${split(input.db_disk[0],"=")[1]}'

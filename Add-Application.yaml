@@ -1,0 +1,165 @@
+formatVersion: 1
+inputs:
+  _vm:
+    type: array
+    title: Hostnames
+  _apps_param:
+    type: array
+    description: 'simple format: [key]=[val], list format: [key]=[val1]&[val2]&[val3]'
+    title: Parameters
+    default: ''
+  image:
+    type: string
+    default: RHEL7.9
+    title: Image
+    enum:
+      - Windows_Template
+      - RHEL7.9
+  _image_linux_yn:
+    type: string
+    title: Linux_YN
+    enum:
+      - 'Y'
+      - 'N'
+  cpu:
+    type: integer
+    default: 2
+    title: CPU
+  memory:
+    type: integer
+    title: Memory(GB)
+    default: 4
+  apps:
+    type: array
+    description: ''
+    title: Application
+    default: ''
+  _fab:
+    type: string
+    title: Faboratory
+  _svc:
+    type: string
+    title: Service
+  _purpose:
+    type: string
+    title: Purpose
+  #_p_kubun:
+  #  type: string
+  #  title: Distingush
+  os_param:
+    type: array
+    description: ''
+    title: os_param
+    default: ''
+  multi_disk:
+    type: array
+    title: Disk
+    description: mountPath=diskSize
+    maxItems: 4
+resources:
+  # service:
+  #   type: Cloud.Network
+  #   properties:
+  #     name: 'ServiceNetwork-${env.deploymentName}'
+  #     networkType: existing
+  #     constraints:
+  #       - tag: git-service
+  Public:
+    type: Cloud.Network
+    metadata:
+      layoutPosition:
+        - 0
+        - 0
+    properties:
+      networkType: existing
+      constraints:
+        - tag: git-service
+  vm:
+    type: Cloud.vSphere.Machine
+    metadata:
+      layoutPosition:
+        - 1
+        - 1
+    properties:
+      name: '${join(input._vm,",")}'
+      nodes: '${join(input._vm,",")}'
+      multi_disk: '${join(input.multi_disk,",")}'
+      category: general
+      count_min: 1
+      count_max: 20
+      count_def: 1
+      os_param: '${join(input.os_param,",")}'
+      folderName: '${input._fab}/${input._svc}'
+      count: '${length(input._vm)}'
+      customizationSpec: '${input._image_linux_yn == "Y" ? "LINUX_PROFILE" : "WINDOWS_PROFILE"}'
+      application: '${join(input.apps,",")}'
+      osType: '${input._image_linux_yn == "Y" ? "LINUX" : "WINDOWS"}'
+      param: '${join(input._apps_param,",")}'
+      image: '${input.image}'
+      cpuCount: '${input.cpu}'
+      totalMemoryMB: '${input.memory*1024}'
+      memGB: '${input.memory}'
+      cpu: '${input.cpu}'
+      clusterGroup: '${input._fab}'
+      service_code: '${input._svc + input._purpose}'
+      #ft: '${input._cl_kubun == "ft" ? true : false}'
+      tags:
+        - key: fab
+          value: '${input._fab}'
+        - key: svc
+          value: '${input._svc}'
+        - key: purpose
+          value: '${input._purpose}'
+        #- key: p_kubun
+        #  value: '${input._p_kubun}'
+        - key: ServiceCode
+          value: '${input._svc + input._purpose}'
+      networks:
+        - network: '${resource.Public.id}'
+          assignment: static
+      attachedDisks: '${map_to_object(resource.DISK1[*].id+resource.DISK2[*].id+resource.DISK3[*].id+resource.DISK4[*].id, "source")}'
+      constraints:
+        - tag: git
+  DISK1:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 1
+        - 2
+    properties:
+      capacityGb: '${length(input.multi_disk)>=1 ? (split(input.multi_disk[0],"=")[1]): 0 }'
+      count: '${length(input.multi_disk)>=1 ? 1 : 0}'
+  DISK2:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 1
+        - 3
+    properties:
+      capacityGb: '${length(input.multi_disk)>=2 ? (split(input.multi_disk[1],"=")[1]): 0 }'
+      count: '${length(input.multi_disk)>=2 ? 1 : 0}'
+  DISK3:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 1
+        - 4
+    properties:
+      capacityGb: '${length(input.multi_disk)>=3 ? (split(input.multi_disk[2],"=")[1]): 0 }'
+      count: '${length(input.multi_disk)>=3 ? 1 : 0}'
+  DISK4:
+    type: Cloud.vSphere.Disk
+    metadata:
+      layoutPosition:
+        - 1
+        - 5
+    properties:
+      capacityGb: '${length(input.multi_disk)>=4 ? (split(input.multi_disk[3],"=")[1]): 0 }'
+      count: '${length(input.multi_disk)>=4 ? 1 : 0}'
+# backup:
+#   type: Cloud.Network
+#   properties:
+#     name: 'BackupNetwork-${env.deploymentName}'
+#     networkType: existing
+#     constraints:
+#       - tag: '${input._fab == "git" ? "git-backup" : (input._fab)+"-backup"}'
